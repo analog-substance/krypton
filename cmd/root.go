@@ -35,24 +35,37 @@ var rootCmd = &cobra.Command{
 		}
 		discoverCmd.Env = append(discoverCmd.Env, fmt.Sprintf("NMAP=%s", nmapPath))
 
-		hosts, err := discoverCmd.Output()
+		output, err := discoverCmd.Output()
 		if err != nil {
 			return fmt.Errorf("error occurred while discovering hosts: %v", err)
 		}
 
-		servicesCmd, err := static.Command("bin/as-recon-discover-services")
+		tcpCmd, err := static.Command("bin/as-recon-discover-tcp-services")
 		if err != nil {
 			return err
 		}
-		servicesCmd.Stdout = os.Stdout
+		tcpCmd.Stdout = os.Stdout
 
+		hosts := string(output)
 		env := []string{
-			fmt.Sprintf("SCRIPT_STDIN=%s", string(hosts)),
+			fmt.Sprintf("SCRIPT_STDIN=%s", hosts),
 			fmt.Sprintf("NMAP=%s", nmapPath),
 		}
-		servicesCmd.Env = append(servicesCmd.Env, env...)
+		tcpCmd.Env = append(tcpCmd.Env, env...)
 
-		return servicesCmd.Run()
+		err = tcpCmd.Run()
+		if err != nil {
+			return err
+		}
+
+		udpCmd, err := static.Command("bin/as-recon-discover-udp-services")
+		if err != nil {
+			return err
+		}
+		udpCmd.Stdout = os.Stdout
+		udpCmd.Env = append(udpCmd.Env, env...)
+
+		return udpCmd.Run()
 	},
 }
 
