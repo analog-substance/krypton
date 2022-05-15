@@ -3,7 +3,7 @@ module github.com/analog-substance/krypton
 go 1.18
 
 require (
-	github.com/analog-substance/arsenic-static v0.0.0-20220515191506-3b061c0f000c
+	github.com/analog-substance/arsenic-static v0.0.0-20220515193054-b1cf0a3e6b1b
 	github.com/spf13/cobra v1.4.0
 )
 
