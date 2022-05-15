@@ -1,12 +1,9 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
-	"runtime"
 
-	static "github.com/analog-substance/arsenic-static"
-	"github.com/analog-substance/krypton/internal/bin"
+	"github.com/analog-substance/krypton/internal/run"
 	"github.com/spf13/cobra"
 )
 
@@ -16,56 +13,23 @@ var rootCmd = &cobra.Command{
 	Short: "An arsenic style tool to scan internal networks via embedded scripts",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		networks, _ := cmd.Flags().GetString("networks")
+		fromDisk, _ := cmd.Flags().GetBool("from-disk")
 
-		nmapPath, err := bin.Locate("nmap")
-		if err != nil {
-			nmapPath = "./nmap"
-
-			fmt.Println("[-] nmap either not found or an error occurred. Falling back writing to disk")
-
-			err = bin.WriteAs(fmt.Sprintf("nmap_%s", runtime.GOARCH), "nmap")
-			if err != nil {
-				return fmt.Errorf("error occurred while writing nmap to disk: %v", err)
-			}
+		if fromDisk {
+			run.SetExecMode(run.ExecFromDisk)
 		}
 
-		discoverCmd, err := static.Command("bin/as-recon-discover-hosts", networks)
-		if err != nil {
-			return err
-		}
-		discoverCmd.Env = append(discoverCmd.Env, fmt.Sprintf("NMAP=%s", nmapPath))
-
-		output, err := discoverCmd.Output()
-		if err != nil {
-			return fmt.Errorf("error occurred while discovering hosts: %v", err)
-		}
-
-		tcpCmd, err := static.Command("bin/as-recon-discover-tcp-services")
-		if err != nil {
-			return err
-		}
-		tcpCmd.Stdout = os.Stdout
-
-		hosts := string(output)
-		env := []string{
-			fmt.Sprintf("SCRIPT_STDIN=%s", hosts),
-			fmt.Sprintf("NMAP=%s", nmapPath),
-		}
-		tcpCmd.Env = append(tcpCmd.Env, env...)
-
-		err = tcpCmd.Run()
+		hosts, err := run.DiscoverHosts(networks)
 		if err != nil {
 			return err
 		}
 
-		udpCmd, err := static.Command("bin/as-recon-discover-udp-services")
+		err = run.DiscoverTCPServices(hosts)
 		if err != nil {
 			return err
 		}
-		udpCmd.Stdout = os.Stdout
-		udpCmd.Env = append(udpCmd.Env, env...)
 
-		return udpCmd.Run()
+		return run.DiscoverUDPServices(hosts)
 	},
 }
 
@@ -80,4 +44,5 @@ func Execute() {
 
 func init() {
 	rootCmd.Flags().StringP("networks", "n", "", "The CIDR networks on which to discover hosts. Defaults to the machines current networks.")
+	rootCmd.Flags().Bool("from-disk", false, "Executes the scripts from disk instead of from memory")
 }
